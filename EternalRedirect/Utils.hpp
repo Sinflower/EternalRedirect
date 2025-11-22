@@ -1,0 +1,105 @@
+#pragma once
+
+#include <string>
+#include <vector>
+#include <windows.h>
+
+std::string sjis2utf8(const char* sjis)
+{
+	int len = MultiByteToWideChar(932, 0, sjis, -1, NULL, 0);
+	std::wstring wstr;
+	wstr.resize(len);
+	MultiByteToWideChar(932, 0, sjis, -1, &wstr[0], len);
+
+	len = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, NULL, 0, NULL, NULL);
+	std::string utf8;
+	utf8.resize(len);
+	WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, &utf8[0], len, NULL, NULL);
+
+	// Remove the null terminator added by WideCharToMultiByte
+	if (!utf8.empty() && utf8.back() == '\0')
+		utf8.pop_back();
+
+	return utf8;
+}
+
+std::string replaceAll(const std::string& str, const std::string& from, const std::string& to)
+{
+	std::string result = str;
+	size_t start_pos   = 0;
+	while ((start_pos = result.find(from, start_pos)) != std::string::npos)
+	{
+		result.replace(start_pos, from.length(), to);
+		start_pos += to.length(); // Move past the replacement
+	}
+
+	return result;
+}
+
+std::vector<std::string> splitString(const std::string& str, const char& delimiter = '\n')
+{
+	std::vector<std::string> tokens;
+	size_t start = 0;
+	size_t end   = str.find(delimiter);
+
+	while (end != std::string::npos)
+	{
+		tokens.push_back(str.substr(start, end - start));
+		start = end + 1;
+		end   = str.find(delimiter, start);
+	}
+
+	tokens.push_back(str.substr(start));
+	return tokens;
+}
+
+//
+// Determine the offset for the given function
+//
+uintptr_t findFunction(const std::vector<BYTE>& tarBytes)
+{
+	const uintptr_t startAddress = reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
+	MEMORY_BASIC_INFORMATION info;
+	uintptr_t endAddress = startAddress;
+
+	do
+	{
+		VirtualQuery((void*)endAddress, &info, sizeof(info));
+		endAddress = (uintptr_t)info.BaseAddress + info.RegionSize;
+	} while (info.Protect > PAGE_NOACCESS);
+
+	endAddress -= info.RegionSize;
+
+	const std::vector<BYTE> ccBytes = { 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC }; // a 0xCC based alignment is used after/before a function
+
+	const DWORD procMemLength = static_cast<DWORD>(endAddress - startAddress);
+	const DWORD tarLength     = static_cast<DWORD>(tarBytes.size());
+	const BYTE* pProcData     = reinterpret_cast<BYTE*>(startAddress);
+
+	DWORD lastCCOffset = 0;
+
+	for (DWORD i = 0; i < procMemLength - tarLength; i++)
+	{
+		for (DWORD j = 0; j <= tarLength; j++)
+		{
+			if (j == tarLength)
+			{
+#if INCLUDE_DEBUG_LOGGING
+				Syelog(SYELOG_SEVERITY_INFORMATION, "Func Address : %p", startAddress + lastCCOffset);
+#endif
+				return startAddress + lastCCOffset;
+			}
+			else if (pProcData[i + j] != tarBytes[j])
+				break;
+		}
+
+		if (pProcData[i] == 0xCC)
+			lastCCOffset = i;
+
+		while (pProcData[lastCCOffset++] == 0xCC)
+			;
+		lastCCOffset--;
+	}
+
+	return static_cast<uintptr_t>(-1);
+}

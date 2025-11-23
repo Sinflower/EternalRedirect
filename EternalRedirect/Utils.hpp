@@ -96,35 +96,19 @@ uintptr_t findFunction(const std::vector<BYTE>& tarBytes)
 
 	endAddress -= info.RegionSize;
 
-	const std::vector<BYTE> ccBytes = { 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC }; // a 0xCC based alignment is used after/before a function
-
 	const DWORD procMemLength = static_cast<DWORD>(endAddress - startAddress);
 	const DWORD tarLength     = static_cast<DWORD>(tarBytes.size());
 	const BYTE* pProcData     = reinterpret_cast<BYTE*>(startAddress);
-
-	DWORD lastCCOffset = 0;
 
 	for (DWORD i = 0; i < procMemLength - tarLength; i++)
 	{
 		for (DWORD j = 0; j <= tarLength; j++)
 		{
 			if (j == tarLength)
-			{
-#if INCLUDE_DEBUG_LOGGING
-				Syelog(SYELOG_SEVERITY_INFORMATION, "Func Address : %p", startAddress + lastCCOffset);
-#endif
-				return startAddress + lastCCOffset;
-			}
+				return startAddress + i;
 			else if (pProcData[i + j] != tarBytes[j])
 				break;
 		}
-
-		if (pProcData[i] == 0xCC)
-			lastCCOffset = i;
-
-		while (pProcData[lastCCOffset++] == 0xCC)
-			;
-		lastCCOffset--;
 	}
 
 	return static_cast<uintptr_t>(-1);

@@ -76,10 +76,12 @@ nlohmann::json g_translations;
 TranslationEntry g_largestCopiedStrSinceResize = {};
 
 static const std::string TRANSLATIONS_FILE = "tr.json";
+static const std::string WINDOW_TITLE_KEY  = "window_title";
 
 static const std::vector<BYTE> DRAW_FORMAT_VSTRING_FUNC          = { 0x40, 0x53, 0x55, 0x56, 0x41, 0x56, 0x41, 0x57, 0x48, 0x81 };
 static const std::vector<BYTE> COPY_FUNC                         = { 0x48, 0x89, 0x5C, 0x24, 0x10, 0x57, 0x48, 0x83, 0xEC, 0x20, 0x48, 0x8B, 0xF9, 0x48, 0xC7, 0xC3 };
 static const std::vector<BYTE> GET_DRAW_FORMAT_STRING_WIDTH_FUNC = { 0x48, 0x89, 0x4C, 0x24, 0x08, 0x48, 0x89, 0x54, 0x24, 0x10, 0x4C, 0x89, 0x44, 0x24, 0x18, 0x4C, 0x89, 0x4C, 0x24, 0x20, 0x53, 0x56 };
+static const std::vector<BYTE> SET_WINDOW_TITLE_FUNC             = { 0x48, 0x89, 0x5C, 0x24, 0x20, 0x55, 0x56, 0x57, 0x41, 0x55, 0x41, 0x57, 0x48, 0x81, 0xEC, 0x40, 0x04, 0x00, 0x00, 0x48, 0x8B, 0x05, 0xA6, 0x92 };
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -94,15 +96,47 @@ extern "C"
 	CopyFunc Real_CopyFunc = nullptr;
 
 	int64_t(WINAPI* Real_GetDrawFormatStringWidth)(const char* FormatString, ...) = nullptr;
+	int64_t(WINAPI* Real_SetWindowTitle)(const char* WindowText)                  = nullptr;
 }
 
 //
 //
 //////////////////////////////////////////////////////////////////////////////
 
+bool getEntryAndCheck(const std::string& key, nlohmann::json& outEntry)
+{
+	if (g_translations.contains(key))
+	{
+		const nlohmann::json& entry = g_translations[key];
+		if (!entry.contains("text") || !entry.contains("pixel_lengths"))
+			return false;
+
+		outEntry = entry;
+		return true;
+	}
+	return false;
+}
+
 //////////////////////////////////////////////////////////////////////////////
 // Detours
 //
+
+int64_t WINAPI Mine_SetWindowTitle(const char* WindowText)
+{
+	int64_t result = -1;
+
+	// Check if this string exists in the translations
+	if (g_translations.contains(WINDOW_TITLE_KEY))
+	{
+		std::string translatedString = g_translations[WINDOW_TITLE_KEY];
+
+		result = Real_SetWindowTitle(translatedString.c_str());
+	}
+	else
+		result = Real_SetWindowTitle(WindowText);
+
+	return result;
+}
 
 int64_t WINAPI Mine_GetDrawFormatStringWidth(const char* FormatString, ...)
 {
@@ -113,24 +147,21 @@ int64_t WINAPI Mine_GetDrawFormatStringWidth(const char* FormatString, ...)
 	// Check if this string exists in the translations
 	if (g_translations.contains(utf8String))
 	{
-		const nlohmann::json& translationEntry   = g_translations[utf8String];
-		std::string tStr                         = translationEntry["text"];
-		const std::vector<uint32_t> pixelLengths = translationEntry["pixel_lengths"].get<std::vector<uint32_t>>();
+		nlohmann::json entry;
+
+		if (!getEntryAndCheck(utf8String, entry))
+			return Real_GetDrawFormatStringWidth(FormatString);
+
+		std::string tStr = entry["text"];
+
+		const std::vector<uint32_t> pixelLengths = entry["pixel_lengths"].get<std::vector<uint32_t>>();
+
 		// This should only have a single entry so just take the first -- Maybe expand later if needed
 		const uint32_t pixelLength = pixelLengths.empty() ? 0 : pixelLengths[0];
 
-#if INCLUDE_DEBUG_LOGGING
-		// Syelog(SYELOG_SEVERITY_INFORMATION, "Calculating width for translated string: \"%s\" (expected pixel length: %d)\n", tStr.c_str(), pixelLength);
-#endif
-
 		// Now determine which is the largest string
 		if (g_largestCopiedStrSinceResize > pixelLength)
-		{
-#if INCLUDE_DEBUG_LOGGING
-			// Syelog(SYELOG_SEVERITY_INFORMATION, "Using largest copied string since resize for width calculation: \"%s\" instead of \"%s\"\n", g_largestCopiedStrSinceResize.text.c_str(), tStr.c_str());
-#endif
 			tStr = g_largestCopiedStrSinceResize.text;
-		}
 
 		// Clear the largest string since resize after using it
 		g_largestCopiedStrSinceResize.clear();
@@ -153,10 +184,13 @@ VOID* WINAPI Mine_CopyFunc(void* a1, uint8_t* a2, int64_t a3)
 	// Check if this string exists in the translations
 	if (g_translations.contains(utf8String))
 	{
-		const nlohmann::json& translationEntry = g_translations[utf8String];
+		nlohmann::json entry;
 
-		const std::string tStr             = translationEntry["text"];
-		std::vector<uint32_t> pixelLengths = translationEntry["pixel_lengths"].get<std::vector<uint32_t>>();
+		if (!getEntryAndCheck(utf8String, entry))
+			return Real_CopyFunc(a1, a2, a3);
+
+		const std::string tStr             = entry["text"];
+		std::vector<uint32_t> pixelLengths = entry["pixel_lengths"].get<std::vector<uint32_t>>();
 		std::vector<std::string> lines     = splitString(tStr, '\n');
 
 		// Find the largest line by pixel length
@@ -172,9 +206,7 @@ VOID* WINAPI Mine_CopyFunc(void* a1, uint8_t* a2, int64_t a3)
 		delete[] pBuffer;
 	}
 	else
-	{
 		result = Real_CopyFunc(a1, a2, a3);
-	}
 
 	return result;
 }
@@ -196,13 +228,17 @@ int WINAPI Mine_DrawFormatVStringToHandle(int x, int y, unsigned int Color, int 
 	// Check if this string exists in the translations
 	if (g_translations.contains(utf8String))
 	{
-		std::string translatedString = g_translations[utf8String]["text"];
-		result                       = Real_DrawFormatVStringToHandle(x, y, Color, FontHandle, translatedString.c_str());
+		nlohmann::json entry;
+
+		if (!getEntryAndCheck(utf8String, entry))
+			return Real_DrawFormatVStringToHandle(x, y, Color, FontHandle, buffer);
+
+		const std::string tStr = entry["text"];
+
+		result = Real_DrawFormatVStringToHandle(x, y, Color, FontHandle, tStr.c_str());
 	}
 	else
-	{
 		result = Real_DrawFormatVStringToHandle(x, y, Color, FontHandle, buffer);
-	}
 
 	return result;
 }
@@ -255,6 +291,7 @@ LONG AttachDetours(VOID)
 	ATTACH(DrawFormatVStringToHandle);
 	ATTACH(CopyFunc);
 	ATTACH(GetDrawFormatStringWidth);
+	ATTACH(SetWindowTitle);
 
 	return DetourTransactionCommit();
 }
@@ -267,6 +304,7 @@ LONG DetachDetours(VOID)
 	DETACH(DrawFormatVStringToHandle);
 	DETACH(CopyFunc);
 	DETACH(GetDrawFormatStringWidth);
+	DETACH(SetWindowTitle);
 
 	return DetourTransactionCommit();
 }
@@ -308,6 +346,12 @@ void SetupHook(T& realFuncPtr, const std::vector<BYTE>& funcBytes, const char* f
 #endif
 		return;
 	}
+	else
+	{
+#if INCLUDE_DEBUG_LOGGING
+		Syelog(SYELOG_SEVERITY_INFORMATION, "### Found %s function at address: 0x%p\n", funcName, reinterpret_cast<void*>(funcAddr));
+#endif
+	}
 
 	realFuncPtr = reinterpret_cast<T>(funcAddr);
 }
@@ -345,6 +389,7 @@ BOOL ProcessAttach(HMODULE hDll)
 	SetupHook(Real_DrawFormatVStringToHandle, DRAW_FORMAT_VSTRING_FUNC, "DrawFormatVStringToHandle");
 	SetupHook(Real_CopyFunc, COPY_FUNC, "CopyFunc");
 	SetupHook(Real_GetDrawFormatStringWidth, GET_DRAW_FORMAT_STRING_WIDTH_FUNC, "GetDrawFormatStringWidth");
+	SetupHook(Real_SetWindowTitle, SET_WINDOW_TITLE_FUNC, "SetWindowTitle");
 
 	LONG error = AttachDetours();
 

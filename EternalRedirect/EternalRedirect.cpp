@@ -297,6 +297,18 @@ PCHAR DetRealName(const char* psz)
 
 VOID DetAttach(PVOID* ppbReal, PVOID pbMine, const char* psz)
 {
+	if (*ppbReal == nullptr || pbMine == nullptr)
+	{
+#if INCLUDE_DEBUG_LOGGING
+		if (ppbReal == nullptr)
+			Syelog(SYELOG_SEVERITY_NOTICE, "Attach failed: `%s': ppbReal is nullptr\n", DetRealName(psz));
+		if (pbMine == nullptr)
+			Syelog(SYELOG_SEVERITY_NOTICE, "Attach failed: `%s': pbMine is nullptr\n", DetRealName(psz));
+#endif
+
+		return;
+	}
+
 	LONG l = DetourAttach(ppbReal, pbMine);
 #if INCLUDE_DEBUG_LOGGING
 	if (l != 0)
@@ -306,6 +318,17 @@ VOID DetAttach(PVOID* ppbReal, PVOID pbMine, const char* psz)
 
 VOID DetDetach(PVOID* ppbReal, PVOID pbMine, const char* psz)
 {
+	if (*ppbReal == nullptr || pbMine == nullptr)
+	{
+#if INCLUDE_DEBUG_LOGGING
+		if (ppbReal == nullptr)
+			Syelog(SYELOG_SEVERITY_NOTICE, "Detach failed: `%s': ppbReal is nullptr\n", DetRealName(psz));
+		if (pbMine == nullptr)
+			Syelog(SYELOG_SEVERITY_NOTICE, "Detach failed: `%s': pbMine is nullptr\n", DetRealName(psz));
+#endif
+		return;
+	}
+
 	LONG l = DetourDetach(ppbReal, pbMine);
 #if INCLUDE_DEBUG_LOGGING
 	if (l != 0)
@@ -369,6 +392,7 @@ BOOL ThreadDetach([[maybe_unused]] HMODULE hDll)
 template<typename T>
 void SetupHook(T& realFuncPtr, const std::vector<BYTE>& funcBytes, const char* funcName)
 {
+	realFuncPtr        = nullptr;
 	uintptr_t funcAddr = findFunction(funcBytes);
 
 	if (funcAddr == ~0)

@@ -52,7 +52,9 @@ static const std::string TRANSLATIONS_FILE = "tr.json";
 
 static const std::vector<BYTE> EXE_STRING_FUNC = { 0x53, 0x56, 0x8B, 0xF1, 0x8B, 0x4C, 0x24, 0x0C, 0x57, 0x85, 0xC9, 0x74, 0x49, 0x8B, 0x7E, 0x18, 0x8D, 0x46, 0x04, 0x83, 0xFF, 0x08, 0x72, 0x04, 0x8B, 0x10, 0xEB, 0x02, 0x8B, 0xD0, 0x3B, 0xCA, 0x72, 0x34, 0x83, 0xFF, 0x08, 0x72, 0x04, 0x8B, 0x10, 0xEB, 0x02, 0x8B, 0xD0, 0x8B, 0x5E, 0x14, 0x8D, 0x14, 0x5A, 0x3B, 0xD1, 0x76, 0x1F, 0x83, 0xFF, 0x08, 0x72, 0x02, 0x8B, 0x00, 0x8B, 0x54, 0x24, 0x14, 0x2B, 0xC8, 0x52, 0xD1, 0xF9, 0x51, 0x56, 0x8B, 0xCE, 0xE8, 0x00, 0xFD, 0xFF, 0xFF };
 
-static const std::vector<BYTE> FORMAT_STRING_FUNC = { 0x6A, 0xFF, 0x68, 0xC8, 0x62, 0xDD, 0x00, 0x64, 0xA1, 0x00, 0x00, 0x00, 0x00, 0x50, 0x83, 0xEC, 0x1C, 0x53, 0x56, 0x57, 0xA1, 0x90, 0xEA, 0xEC, 0x00, 0x33, 0xC4, 0x50, 0x8D, 0x44, 0x24, 0x2C, 0x64, 0xA3, 0x00, 0x00, 0x00, 0x00, 0x8B, 0x7C, 0x24, 0x3C, 0x33, 0xDB, 0x68, 0x00, 0x01, 0x00 };
+// RVA Offsets for the SEH functions to hook
+static const uint32_t EXE_STRING_FUNC_2_OFFSET  = 0x1CF050;
+static const uint32_t FORMAT_STRING_FUNC_OFFSET = 0x1C2C40;
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -60,8 +62,9 @@ static const std::vector<BYTE> FORMAT_STRING_FUNC = { 0x6A, 0xFF, 0x68, 0xC8, 0x
 
 extern "C"
 {
-	DWORD*(__fastcall* Real_ExeStringFunc)(DWORD* a1, int32_t a2, BYTE* Source, uint32_t a4) = nullptr;
-	int(WINAPI* Real_FormatStringFunc)(int a1, wchar_t* Format, ...)                         = nullptr;
+	DWORD*(__fastcall* Real_ExeStringFunc)(DWORD* a1, int32_t a2, BYTE* Source, uint32_t a4)                       = nullptr;
+	int*(__cdecl* Real_ExeStringFunc2)(int* a1, int a2, WORD* a3, int* a4, int a5, int a6, int a7, int a8, int a9) = nullptr;
+	int(WINAPI* Real_FormatStringFunc)(int a1, wchar_t* Format, ...)                                               = nullptr;
 }
 
 //
@@ -74,10 +77,8 @@ extern "C"
 
 DWORD* __fastcall Mine_ExeStringFunc(DWORD* a1, int32_t a2, BYTE* pSource, uint32_t a4)
 {
-	DWORD* result           = nullptr;
 	std::wstring unicodeStr = reinterpret_cast<const wchar_t*>(pSource);
-
-	std::string utf8String = unicode2utf8(unicodeStr);
+	std::string utf8String  = unicode2utf8(unicodeStr);
 
 	// Check if this string exists in the translations
 	if (g_translations.contains(utf8String))
@@ -86,13 +87,38 @@ DWORD* __fastcall Mine_ExeStringFunc(DWORD* a1, int32_t a2, BYTE* pSource, uint3
 		if (trStr == "")
 			return Real_ExeStringFunc(a1, a2, pSource, a4);
 
+#if INCLUDE_DEBUG_LOGGING
+		//_Print("Using Translated String: %s\n", trStr.c_str());
+#endif
+
 		unicodeStr = utf82unicode(trStr);
-		result     = Real_ExeStringFunc(a1, a2, reinterpret_cast<BYTE*>(const_cast<wchar_t*>(unicodeStr.c_str())), unicodeStr.size());
+		return Real_ExeStringFunc(a1, a2, reinterpret_cast<BYTE*>(const_cast<wchar_t*>(unicodeStr.c_str())), unicodeStr.size());
 	}
 	else
-		result = Real_ExeStringFunc(a1, a2, pSource, a4);
+		return Real_ExeStringFunc(a1, a2, pSource, a4);
+}
 
-	return result;
+int* __cdecl Mine_ExeStringFunc2(int* a1, int a2, WORD* a3, int* a4, int a5, int a6, int a7, int a8, int a9)
+{
+	std::wstring unicodeStr = reinterpret_cast<const wchar_t*>(a3);
+	std::string utf8String  = unicode2utf8(unicodeStr);
+
+	// Check if this string exists in the translations
+	if (g_translations.contains(utf8String))
+	{
+		const std::string trStr = g_translations[utf8String].get<std::string>();
+		if (trStr == "")
+			return Real_ExeStringFunc2(a1, a2, a3, a4, a5, a6, a7, a8, a9);
+
+#if INCLUDE_DEBUG_LOGGING
+		//_Print("Using Translated String: %s\n", trStr.c_str());
+#endif
+
+		unicodeStr = utf82unicode(trStr);
+		return Real_ExeStringFunc2(a1, a2, reinterpret_cast<WORD*>(const_cast<wchar_t*>(unicodeStr.c_str())), a4, a5, a6, a7, a8, a9);
+	}
+	else
+		return Real_ExeStringFunc2(a1, a2, a3, a4, a5, a6, a7, a8, a9);
 }
 
 int WINAPI Mine_FormatStringFunc(int a1, wchar_t* Format, ...)
@@ -106,7 +132,12 @@ int WINAPI Mine_FormatStringFunc(int a1, wchar_t* Format, ...)
 	{
 		const std::string trStr = g_translations[utf8FmtStr].get<std::string>();
 		if (trStr != "")
+		{
 			fmtStr = utf82unicode(trStr);
+#if INCLUDE_DEBUG_LOGGING
+			//_Print("Using Translated Format String: %s\n", trStr.c_str());
+#endif
+		}
 	}
 
 	va_list args;
@@ -186,6 +217,7 @@ LONG AttachDetours(VOID)
 	DetourUpdateThread(GetCurrentThread());
 
 	ATTACH(ExeStringFunc);
+	ATTACH(ExeStringFunc2);
 	ATTACH(FormatStringFunc);
 
 	return DetourTransactionCommit();
@@ -197,6 +229,7 @@ LONG DetachDetours(VOID)
 	DetourUpdateThread(GetCurrentThread());
 
 	DETACH(ExeStringFunc);
+	DETACH(ExeStringFunc2);
 	DETACH(FormatStringFunc);
 
 	return DetourTransactionCommit();
@@ -232,6 +265,29 @@ void SetupHook(T& realFuncPtr, const std::vector<BYTE>& funcBytes, const char* f
 {
 	realFuncPtr        = nullptr;
 	uintptr_t funcAddr = findFunction(funcBytes);
+
+	if (funcAddr == ~0)
+	{
+#if INCLUDE_DEBUG_LOGGING
+		Syelog(SYELOG_SEVERITY_FATAL, "### Error: Unable to find the %s function\n", funcName);
+#endif
+		return;
+	}
+	else
+	{
+#if INCLUDE_DEBUG_LOGGING
+		Syelog(SYELOG_SEVERITY_INFORMATION, "### Found %s function at address: 0x%p\n", funcName, reinterpret_cast<void*>(funcAddr));
+#endif
+	}
+
+	realFuncPtr = reinterpret_cast<T>(funcAddr);
+}
+
+template<typename T>
+void SetupHook(T& realFuncPtr, const uint32_t& funcOffset, const char* funcName)
+{
+	realFuncPtr        = nullptr;
+	uintptr_t funcAddr = calcFunctionAddress(funcOffset);
 
 	if (funcAddr == ~0)
 	{
@@ -291,7 +347,8 @@ BOOL ProcessAttach(HMODULE hDll)
 	}
 
 	SetupHook(Real_ExeStringFunc, EXE_STRING_FUNC, "ExeStringFunc");
-	SetupHook(Real_FormatStringFunc, FORMAT_STRING_FUNC, "FormatStringFunc");
+	SetupHook(Real_ExeStringFunc2, EXE_STRING_FUNC_2_OFFSET, "ExeStringFunc2");
+	SetupHook(Real_FormatStringFunc, FORMAT_STRING_FUNC_OFFSET, "FormatStringFunc");
 
 	LONG error = AttachDetours();
 

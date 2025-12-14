@@ -160,3 +160,9 @@ uintptr_t findFunction(const std::vector<BYTE>& tarBytes)
 
 	return static_cast<uintptr_t>(-1);
 }
+
+uintptr_t calcFunctionAddress(const uint32_t& funcOffset)
+{
+	const uintptr_t baseAddress = reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
+	return baseAddress + funcOffset;
+}

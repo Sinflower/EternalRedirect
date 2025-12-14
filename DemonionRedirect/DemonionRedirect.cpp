@@ -54,7 +54,6 @@ static const std::vector<BYTE> EXE_STRING_FUNC = { 0x53, 0x56, 0x8B, 0xF1, 0x8B,
 
 static const std::vector<BYTE> FORMAT_STRING_FUNC = { 0x6A, 0xFF, 0x68, 0xC8, 0x62, 0xDD, 0x00, 0x64, 0xA1, 0x00, 0x00, 0x00, 0x00, 0x50, 0x83, 0xEC, 0x1C, 0x53, 0x56, 0x57, 0xA1, 0x90, 0xEA, 0xEC, 0x00, 0x33, 0xC4, 0x50, 0x8D, 0x44, 0x24, 0x2C, 0x64, 0xA3, 0x00, 0x00, 0x00, 0x00, 0x8B, 0x7C, 0x24, 0x3C, 0x33, 0xDB, 0x68, 0x00, 0x01, 0x00 };
 
-
 //////////////////////////////////////////////////////////////////////////////
 //
 // Real function pointers for detoured functions
@@ -75,7 +74,7 @@ extern "C"
 
 DWORD* __fastcall Mine_ExeStringFunc(DWORD* a1, int32_t a2, BYTE* pSource, uint32_t a4)
 {
-	DWORD* result = nullptr;
+	DWORD* result           = nullptr;
 	std::wstring unicodeStr = reinterpret_cast<const wchar_t*>(pSource);
 
 	std::string utf8String = unicode2utf8(unicodeStr);
@@ -88,7 +87,7 @@ DWORD* __fastcall Mine_ExeStringFunc(DWORD* a1, int32_t a2, BYTE* pSource, uint3
 			return Real_ExeStringFunc(a1, a2, pSource, a4);
 
 		unicodeStr = utf82unicode(trStr);
-		result = Real_ExeStringFunc(a1, a2, reinterpret_cast<BYTE*>(const_cast<wchar_t*>(unicodeStr.c_str())), unicodeStr.size());
+		result     = Real_ExeStringFunc(a1, a2, reinterpret_cast<BYTE*>(const_cast<wchar_t*>(unicodeStr.c_str())), unicodeStr.size());
 	}
 	else
 		result = Real_ExeStringFunc(a1, a2, pSource, a4);
@@ -101,7 +100,7 @@ int WINAPI Mine_FormatStringFunc(int a1, wchar_t* Format, ...)
 	const std::size_t BUFFER_SIZE = 4096;
 	wchar_t buffer[BUFFER_SIZE];
 	std::string utf8FmtStr = unicode2utf8(Format);
-	std::wstring fmtStr = Format;
+	std::wstring fmtStr    = Format;
 
 	if (g_translations.contains(utf8FmtStr))
 	{
@@ -265,20 +264,30 @@ BOOL ProcessAttach(HMODULE hDll)
 	Syelog(SYELOG_SEVERITY_INFORMATION, "### Loading translations...\n");
 #endif
 
-	std::ifstream i(TRANSLATIONS_FILE);
-	if (i.is_open())
+	try
 	{
-		i >> g_translations;
+		std::ifstream i(TRANSLATIONS_FILE);
+		if (i.is_open())
+		{
+			i >> g_translations;
 
 #if INCLUDE_DEBUG_LOGGING
-		Syelog(SYELOG_SEVERITY_INFORMATION, "### Loaded %d translations.\n", g_translations.size());
+			Syelog(SYELOG_SEVERITY_INFORMATION, "### Loaded %d translations.\n", g_translations.size());
 #endif
+		}
+		else
+		{
+#if INCLUDE_DEBUG_LOGGING
+			Syelog(SYELOG_SEVERITY_WARNING, "### Warning: Could not open %s\n", TRANSLATIONS_FILE.c_str());
+#endif
+		}
 	}
-	else
+	catch ([[maybe_unused]] const std::exception& e)
 	{
 #if INCLUDE_DEBUG_LOGGING
-		Syelog(SYELOG_SEVERITY_WARNING, "### Warning: Could not open %s\n", TRANSLATIONS_FILE.c_str());
+		Syelog(SYELOG_SEVERITY_FATAL, "### Error loading translations: %s\n", e.what());
 #endif
+		MessageBox(NULL, L"Failed to load the interface translation. Please make sure the corresponding JSON file is present and valid. Parts of the interface will not be translated.", L"Demonion 2 Redirect", MB_OK | MB_ICONERROR);
 	}
 
 	SetupHook(Real_ExeStringFunc, EXE_STRING_FUNC, "ExeStringFunc");
@@ -325,8 +334,6 @@ BOOL APIENTRY DllMain(HINSTANCE hModule, DWORD dwReason, PVOID lpReserved)
 {
 	(void)hModule;
 	(void)lpReserved;
-
-	//return TRUE;
 
 	if (DetourIsHelperProcess())
 		return TRUE;

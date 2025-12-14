@@ -46,7 +46,7 @@ IMAGE_SECTION_HEADER getRDataSection(std::ifstream& file)
 		throw std::runtime_error("Invalid DOS header signature");
 
 	file.seekg(dosHeader.e_lfanew);
-	IMAGE_NT_HEADERS64 ntHeaders;
+	IMAGE_NT_HEADERS ntHeaders;
 	file.read(reinterpret_cast<char*>(&ntHeaders), sizeof(ntHeaders));
 
 	if (ntHeaders.Signature != IMAGE_NT_SIGNATURE)

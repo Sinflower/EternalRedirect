@@ -38,22 +38,155 @@
 
 //////////////////////////////////////////////////////////////////////////////
 
+class DetourEntry
+{
+public:
+	DetourEntry(const std::vector<BYTE>& searchPattern, PVOID* ppRealFunc, PVOID pMineFunc, const std::string& name = "") :
+		m_searchPattern(searchPattern),
+		m_ppRealFunc(ppRealFunc),
+		m_pMineFunc(pMineFunc),
+		m_name(name)
+	{
+	}
+
+	DetourEntry(const intptr_t& rva, PVOID* ppRealFunc = nullptr, PVOID pMineFunc = nullptr, const std::string& name = "") :
+		m_rva(rva),
+		m_ppRealFunc(ppRealFunc),
+		m_pMineFunc(pMineFunc),
+		m_name(name)
+	{
+	}
+
+	void Setup()
+	{
+		calcVA();
+		if (m_va != -1)
+			*m_ppRealFunc = reinterpret_cast<PVOID>(m_va);
+	}
+
+	bool Attach() const
+	{
+		return attach();
+	}
+
+	bool Detach() const
+	{
+		return detach();
+	}
+
+	PVOID* GetRealFuncPtrPtr() const
+	{
+		return m_ppRealFunc;
+	}
+
+	PVOID GetMineFuncPtr() const
+	{
+		return m_pMineFunc;
+	}
+
+	const std::string& GetName() const
+	{
+		return m_name;
+	}
+
+private:
+	void calcVA()
+	{
+		if (m_rva != -1)
+			m_va = calcFunctionAddress(m_rva);
+		else if (!m_searchPattern.empty())
+			m_va = findFunction(m_searchPattern);
+		else
+			m_va = -1;
+
+		if (m_va == -1)
+		{
+#if INCLUDE_DEBUG_LOGGING
+			Syelog(SYELOG_SEVERITY_FATAL, "### Error: Unable to find the %s function\n", m_name.c_str());
+#endif
+			return;
+		}
+		else
+		{
+#if INCLUDE_DEBUG_LOGGING
+			Syelog(SYELOG_SEVERITY_INFORMATION, "### Found %s function at address: 0x%p\n", m_name.c_str(), m_va);
+#endif
+		}
+	}
+
+	bool attach() const
+	{
+		if (*m_ppRealFunc == nullptr || m_pMineFunc == nullptr)
+		{
+#if INCLUDE_DEBUG_LOGGING
+			if (m_ppRealFunc == nullptr)
+				Syelog(SYELOG_SEVERITY_NOTICE, "Attach failed: `%s': m_ppRealFunc is nullptr\n", m_name.c_str());
+			if (m_pMineFunc == nullptr)
+				Syelog(SYELOG_SEVERITY_NOTICE, "Attach failed: `%s': m_pMineFunc is nullptr\n", m_name.c_str());
+#endif
+			return false;
+		}
+
+		LONG l = DetourAttach(m_ppRealFunc, m_pMineFunc);
+		if (l != 0)
+		{
+#if INCLUDE_DEBUG_LOGGING
+			Syelog(SYELOG_SEVERITY_NOTICE, "Attach failed: `%s': error %d\n", m_name.c_str(), l);
+#endif
+			return false;
+		}
+
+		return true;
+	}
+
+	bool detach() const
+	{
+		if (*m_ppRealFunc == nullptr || m_pMineFunc == nullptr)
+		{
+#if INCLUDE_DEBUG_LOGGING
+			if (m_ppRealFunc == nullptr)
+				Syelog(SYELOG_SEVERITY_NOTICE, "Detach failed: `%s': m_ppRealFunc is nullptr\n", m_name.c_str());
+			if (m_pMineFunc == nullptr)
+				Syelog(SYELOG_SEVERITY_NOTICE, "Detach failed: `%s': m_pMineFunc is nullptr\n", m_name.c_str());
+#endif
+			return false;
+		}
+
+		LONG l = DetourDetach(m_ppRealFunc, m_pMineFunc);
+		if (l != 0)
+		{
+#if INCLUDE_DEBUG_LOGGING
+			Syelog(SYELOG_SEVERITY_NOTICE, "Detach failed: `%s': error %d\n", m_name.c_str(), l);
+#endif
+			return false;
+		}
+
+		return true;
+	}
+
+private:
+	std::vector<BYTE> m_searchPattern = {};
+
+	intptr_t m_rva = -1;
+	intptr_t m_va  = -1;
+
+	PVOID* m_ppRealFunc = nullptr;
+	PVOID m_pMineFunc   = nullptr;
+	std::string m_name  = "";
+};
+
 //////////////////////////////////////////////////////////////////////////////
-
-VOID DetAttach(PVOID* ppbReal, PVOID pbMine, const char* psz);
-VOID DetDetach(PVOID* ppbReal, PVOID pbMine, const char* psz);
-
-#define ATTACH(x) DetAttach(&(PVOID&)Real_##x, Mine_##x, #x)
-#define DETACH(x) DetDetach(&(PVOID&)Real_##x, Mine_##x, #x)
 
 nlohmann::json g_translations;
 
 static const std::string TRANSLATIONS_FILE = "tr.json";
 
-static const std::vector<BYTE> EXE_STRING_FUNC = { 0x53, 0x56, 0x8B, 0xF1, 0x8B, 0x4C, 0x24, 0x0C, 0x57, 0x85, 0xC9, 0x74, 0x49, 0x8B, 0x7E, 0x18, 0x8D, 0x46, 0x04, 0x83, 0xFF, 0x08, 0x72, 0x04, 0x8B, 0x10, 0xEB, 0x02, 0x8B, 0xD0, 0x3B, 0xCA, 0x72, 0x34, 0x83, 0xFF, 0x08, 0x72, 0x04, 0x8B, 0x10, 0xEB, 0x02, 0x8B, 0xD0, 0x8B, 0x5E, 0x14, 0x8D, 0x14, 0x5A, 0x3B, 0xD1, 0x76, 0x1F, 0x83, 0xFF, 0x08, 0x72, 0x02, 0x8B, 0x00, 0x8B, 0x54, 0x24, 0x14, 0x2B, 0xC8, 0x52, 0xD1, 0xF9, 0x51, 0x56, 0x8B, 0xCE, 0xE8, 0x00, 0xFD, 0xFF, 0xFF };
+// static const std::vector<BYTE> EXE_STRING_FUNC = { 0x53, 0x56, 0x8B, 0xF1, 0x8B, 0x4C, 0x24, 0x0C, 0x57, 0x85, 0xC9, 0x74, 0x49, 0x8B, 0x7E, 0x18, 0x8D, 0x46, 0x04, 0x83, 0xFF, 0x08, 0x72, 0x04, 0x8B, 0x10, 0xEB, 0x02, 0x8B, 0xD0, 0x3B, 0xCA, 0x72, 0x34, 0x83, 0xFF, 0x08, 0x72, 0x04, 0x8B, 0x10, 0xEB, 0x02, 0x8B, 0xD0, 0x8B, 0x5E, 0x14, 0x8D, 0x14, 0x5A, 0x3B, 0xD1, 0x76, 0x1F, 0x83, 0xFF, 0x08, 0x72, 0x02, 0x8B, 0x00, 0x8B, 0x54, 0x24, 0x14, 0x2B, 0xC8, 0x52, 0xD1, 0xF9, 0x51, 0x56, 0x8B, 0xCE, 0xE8, 0x00, 0xFD, 0xFF, 0xFF };
 
-// RVA Offsets for the SEH functions to hook
-static const uint32_t EXE_STRING_FUNC_2_OFFSET  = 0x1CF050;
+// RVA Offsets for the functions to hook
+static const uint32_t EXE_STRING_FUNC_1_OFFSET  = 0x41E0;
+static const uint32_t EXE_STRING_FUNC_2_OFFSET  = 0x34F0;
+static const uint32_t EXE_STRING_FUNC_3_OFFSET  = 0x1CF050;
 static const uint32_t FORMAT_STRING_FUNC_OFFSET = 0x1C2C40;
 
 //////////////////////////////////////////////////////////////////////////////
@@ -62,20 +195,33 @@ static const uint32_t FORMAT_STRING_FUNC_OFFSET = 0x1C2C40;
 
 extern "C"
 {
-	DWORD*(__fastcall* Real_ExeStringFunc)(DWORD* a1, int32_t a2, BYTE* Source, uint32_t a4)                       = nullptr;
-	int*(__cdecl* Real_ExeStringFunc2)(int* a1, int a2, WORD* a3, int* a4, int a5, int a6, int a7, int a8, int a9) = nullptr;
+	DWORD*(__fastcall* Real_ExeStringFunc1)(DWORD* a1, int32_t a2, BYTE* Source, uint32_t a4)                       = nullptr;
+	DWORD*(__fastcall* Real_ExeStringFunc2)(DWORD* a1, int32_t a2, BYTE* Source, uint32_t a4)                      = nullptr;
+	int*(__cdecl* Real_ExeStringFunc3)(int* a1, int a2, WORD* a3, int* a4, int a5, int a6, int a7, int a8, int a9) = nullptr;
 	int(WINAPI* Real_FormatStringFunc)(int a1, wchar_t* Format, ...)                                               = nullptr;
+
+	DWORD* __fastcall Mine_ExeStringFunc1(DWORD* a1, int32_t a2, BYTE* pSource, uint32_t a4);
+	DWORD* __fastcall Mine_ExeStringFunc2(DWORD* a1, int32_t a2, BYTE* pSource, uint32_t a4);
+	int* __cdecl Mine_ExeStringFunc3(int* a1, int a2, WORD* a3, int* a4, int a5, int a6, int a7, int a8, int a9);
+	int WINAPI Mine_FormatStringFunc(int a1, wchar_t* Format, ...);
 }
 
 //
 //
 //////////////////////////////////////////////////////////////////////////////
 
+static std::vector<DetourEntry> g_detours = {
+	DetourEntry(EXE_STRING_FUNC_1_OFFSET, (PVOID*)&Real_ExeStringFunc1, (PVOID)Mine_ExeStringFunc1, "ExeStringFunc1"),
+	DetourEntry(EXE_STRING_FUNC_2_OFFSET, (PVOID*)&Real_ExeStringFunc2, (PVOID)Mine_ExeStringFunc2, "ExeStringFunc2"),
+	DetourEntry(EXE_STRING_FUNC_3_OFFSET, (PVOID*)&Real_ExeStringFunc3, (PVOID)Mine_ExeStringFunc3, "ExeStringFunc3"),
+	DetourEntry(FORMAT_STRING_FUNC_OFFSET, (PVOID*)&Real_FormatStringFunc, (PVOID)Mine_FormatStringFunc, "FormatStringFunc"),
+};
+
 //////////////////////////////////////////////////////////////////////////////
 // Detours
 //
 
-DWORD* __fastcall Mine_ExeStringFunc(DWORD* a1, int32_t a2, BYTE* pSource, uint32_t a4)
+DWORD* __fastcall Mine_ExeStringFunc1(DWORD* a1, int32_t a2, BYTE* pSource, uint32_t a4)
 {
 	std::wstring unicodeStr = reinterpret_cast<const wchar_t*>(pSource);
 	std::string utf8String  = unicode2utf8(unicodeStr);
@@ -85,20 +231,43 @@ DWORD* __fastcall Mine_ExeStringFunc(DWORD* a1, int32_t a2, BYTE* pSource, uint3
 	{
 		const std::string trStr = g_translations[utf8String].get<std::string>();
 		if (trStr == "")
-			return Real_ExeStringFunc(a1, a2, pSource, a4);
+			return Real_ExeStringFunc1(a1, a2, pSource, a4);
 
 #if INCLUDE_DEBUG_LOGGING
-		//_Print("Using Translated String: %s\n", trStr.c_str());
+		_Print("[ExeStringFunc1]: %s\n", trStr.c_str());
 #endif
 
 		unicodeStr = utf82unicode(trStr);
-		return Real_ExeStringFunc(a1, a2, reinterpret_cast<BYTE*>(const_cast<wchar_t*>(unicodeStr.c_str())), unicodeStr.size());
+		return Real_ExeStringFunc1(a1, a2, reinterpret_cast<BYTE*>(const_cast<wchar_t*>(unicodeStr.c_str())), unicodeStr.size());
 	}
 	else
-		return Real_ExeStringFunc(a1, a2, pSource, a4);
+		return Real_ExeStringFunc1(a1, a2, pSource, a4);
 }
 
-int* __cdecl Mine_ExeStringFunc2(int* a1, int a2, WORD* a3, int* a4, int a5, int a6, int a7, int a8, int a9)
+DWORD* __fastcall Mine_ExeStringFunc2(DWORD* a1, int32_t a2, BYTE* pSource, uint32_t a4)
+{
+	std::wstring unicodeStr = reinterpret_cast<const wchar_t*>(pSource);
+	std::string utf8String  = unicode2utf8(unicodeStr);
+
+	// Check if this string exists in the translations
+	if (g_translations.contains(utf8String))
+	{
+		const std::string trStr = g_translations[utf8String].get<std::string>();
+		if (trStr == "")
+			return Real_ExeStringFunc2(a1, a2, pSource, a4);
+
+#if INCLUDE_DEBUG_LOGGING
+		_Print("[ExeStringFunc2]: %s\n", trStr.c_str());
+#endif
+
+		unicodeStr = utf82unicode(trStr);
+		return Real_ExeStringFunc2(a1, a2, reinterpret_cast<BYTE*>(const_cast<wchar_t*>(unicodeStr.c_str())), unicodeStr.size());
+	}
+	else
+		return Real_ExeStringFunc2(a1, a2, pSource, a4);
+}
+
+int* __cdecl Mine_ExeStringFunc3(int* a1, int a2, WORD* a3, int* a4, int a5, int a6, int a7, int a8, int a9)
 {
 	std::wstring unicodeStr = reinterpret_cast<const wchar_t*>(a3);
 	std::string utf8String  = unicode2utf8(unicodeStr);
@@ -108,17 +277,17 @@ int* __cdecl Mine_ExeStringFunc2(int* a1, int a2, WORD* a3, int* a4, int a5, int
 	{
 		const std::string trStr = g_translations[utf8String].get<std::string>();
 		if (trStr == "")
-			return Real_ExeStringFunc2(a1, a2, a3, a4, a5, a6, a7, a8, a9);
+			return Real_ExeStringFunc3(a1, a2, a3, a4, a5, a6, a7, a8, a9);
 
 #if INCLUDE_DEBUG_LOGGING
-		//_Print("Using Translated String: %s\n", trStr.c_str());
+		_Print("[ExeStringFunc3]: %s\n", trStr.c_str());
 #endif
 
 		unicodeStr = utf82unicode(trStr);
-		return Real_ExeStringFunc2(a1, a2, reinterpret_cast<WORD*>(const_cast<wchar_t*>(unicodeStr.c_str())), a4, a5, a6, a7, a8, a9);
+		return Real_ExeStringFunc3(a1, a2, reinterpret_cast<WORD*>(const_cast<wchar_t*>(unicodeStr.c_str())), a4, a5, a6, a7, a8, a9);
 	}
 	else
-		return Real_ExeStringFunc2(a1, a2, a3, a4, a5, a6, a7, a8, a9);
+		return Real_ExeStringFunc3(a1, a2, a3, a4, a5, a6, a7, a8, a9);
 }
 
 int WINAPI Mine_FormatStringFunc(int a1, wchar_t* Format, ...)
@@ -135,7 +304,7 @@ int WINAPI Mine_FormatStringFunc(int a1, wchar_t* Format, ...)
 		{
 			fmtStr = utf82unicode(trStr);
 #if INCLUDE_DEBUG_LOGGING
-			//_Print("Using Translated Format String: %s\n", trStr.c_str());
+			_Print("[FormatStringFunc]: %s\n", trStr.c_str());
 #endif
 		}
 	}
@@ -155,70 +324,14 @@ int WINAPI Mine_FormatStringFunc(int a1, wchar_t* Format, ...)
 /////////////////////////////////////////////////////////////
 // AttachDetours
 //
-PCHAR DetRealName(const char* psz)
-{
-	PCHAR locPsz = const_cast<PCHAR>(psz);
-	PCHAR pszBeg = const_cast<PCHAR>(psz);
-	// Move to end of name.
-	while (*locPsz)
-		locPsz++;
-
-	// Move back through A-Za-z0-9 names.
-	while (locPsz > pszBeg && ((locPsz[-1] >= 'A' && locPsz[-1] <= 'Z') || (locPsz[-1] >= 'a' && locPsz[-1] <= 'z') || (locPsz[-1] >= '0' && locPsz[-1] <= '9')))
-		locPsz--;
-
-	return locPsz;
-}
-
-VOID DetAttach(PVOID* ppbReal, PVOID pbMine, const char* psz)
-{
-	if (*ppbReal == nullptr || pbMine == nullptr)
-	{
-#if INCLUDE_DEBUG_LOGGING
-		if (ppbReal == nullptr)
-			Syelog(SYELOG_SEVERITY_NOTICE, "Attach failed: `%s': ppbReal is nullptr\n", DetRealName(psz));
-		if (pbMine == nullptr)
-			Syelog(SYELOG_SEVERITY_NOTICE, "Attach failed: `%s': pbMine is nullptr\n", DetRealName(psz));
-#endif
-
-		return;
-	}
-
-	LONG l = DetourAttach(ppbReal, pbMine);
-#if INCLUDE_DEBUG_LOGGING
-	if (l != 0)
-		Syelog(SYELOG_SEVERITY_NOTICE, "Attach failed: `%s': error %d\n", DetRealName(psz), l);
-#endif
-}
-
-VOID DetDetach(PVOID* ppbReal, PVOID pbMine, const char* psz)
-{
-	if (*ppbReal == nullptr || pbMine == nullptr)
-	{
-#if INCLUDE_DEBUG_LOGGING
-		if (ppbReal == nullptr)
-			Syelog(SYELOG_SEVERITY_NOTICE, "Detach failed: `%s': ppbReal is nullptr\n", DetRealName(psz));
-		if (pbMine == nullptr)
-			Syelog(SYELOG_SEVERITY_NOTICE, "Detach failed: `%s': pbMine is nullptr\n", DetRealName(psz));
-#endif
-		return;
-	}
-
-	LONG l = DetourDetach(ppbReal, pbMine);
-#if INCLUDE_DEBUG_LOGGING
-	if (l != 0)
-		Syelog(SYELOG_SEVERITY_NOTICE, "Detach failed: `%s': error %d\n", DetRealName(psz), l);
-#endif
-}
 
 LONG AttachDetours(VOID)
 {
 	DetourTransactionBegin();
 	DetourUpdateThread(GetCurrentThread());
 
-	ATTACH(ExeStringFunc);
-	ATTACH(ExeStringFunc2);
-	ATTACH(FormatStringFunc);
+	for (const DetourEntry& detour : g_detours)
+		detour.Attach();
 
 	return DetourTransactionCommit();
 }
@@ -228,9 +341,8 @@ LONG DetachDetours(VOID)
 	DetourTransactionBegin();
 	DetourUpdateThread(GetCurrentThread());
 
-	DETACH(ExeStringFunc);
-	DETACH(ExeStringFunc2);
-	DETACH(FormatStringFunc);
+	for (const DetourEntry& detour : g_detours)
+		detour.Detach();
 
 	return DetourTransactionCommit();
 }
@@ -258,52 +370,6 @@ BOOL ThreadDetach([[maybe_unused]] HMODULE hDll)
 #endif
 
 	return TRUE;
-}
-
-template<typename T>
-void SetupHook(T& realFuncPtr, const std::vector<BYTE>& funcBytes, const char* funcName)
-{
-	realFuncPtr        = nullptr;
-	uintptr_t funcAddr = findFunction(funcBytes);
-
-	if (funcAddr == ~0)
-	{
-#if INCLUDE_DEBUG_LOGGING
-		Syelog(SYELOG_SEVERITY_FATAL, "### Error: Unable to find the %s function\n", funcName);
-#endif
-		return;
-	}
-	else
-	{
-#if INCLUDE_DEBUG_LOGGING
-		Syelog(SYELOG_SEVERITY_INFORMATION, "### Found %s function at address: 0x%p\n", funcName, reinterpret_cast<void*>(funcAddr));
-#endif
-	}
-
-	realFuncPtr = reinterpret_cast<T>(funcAddr);
-}
-
-template<typename T>
-void SetupHook(T& realFuncPtr, const uint32_t& funcOffset, const char* funcName)
-{
-	realFuncPtr        = nullptr;
-	uintptr_t funcAddr = calcFunctionAddress(funcOffset);
-
-	if (funcAddr == ~0)
-	{
-#if INCLUDE_DEBUG_LOGGING
-		Syelog(SYELOG_SEVERITY_FATAL, "### Error: Unable to find the %s function\n", funcName);
-#endif
-		return;
-	}
-	else
-	{
-#if INCLUDE_DEBUG_LOGGING
-		Syelog(SYELOG_SEVERITY_INFORMATION, "### Found %s function at address: 0x%p\n", funcName, reinterpret_cast<void*>(funcAddr));
-#endif
-	}
-
-	realFuncPtr = reinterpret_cast<T>(funcAddr);
 }
 
 BOOL ProcessAttach(HMODULE hDll)
@@ -346,9 +412,8 @@ BOOL ProcessAttach(HMODULE hDll)
 		MessageBox(NULL, L"Failed to load the interface translation. Please make sure the corresponding JSON file is present and valid. Parts of the interface will not be translated.", L"Demonion 2 Redirect", MB_OK | MB_ICONERROR);
 	}
 
-	SetupHook(Real_ExeStringFunc, EXE_STRING_FUNC, "ExeStringFunc");
-	SetupHook(Real_ExeStringFunc2, EXE_STRING_FUNC_2_OFFSET, "ExeStringFunc2");
-	SetupHook(Real_FormatStringFunc, FORMAT_STRING_FUNC_OFFSET, "FormatStringFunc");
+	for (DetourEntry& detour : g_detours)
+		detour.Setup();
 
 	LONG error = AttachDetours();
 

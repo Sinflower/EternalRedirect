@@ -129,27 +129,27 @@ std::vector<std::string> splitString(const std::string& str, const char& delimit
 //
 // Determine the offset for the given function
 //
-uintptr_t findFunction(const std::vector<BYTE>& tarBytes)
+intptr_t findFunction(const std::vector<BYTE>& tarBytes)
 {
-	const uintptr_t startAddress = reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
+	const intptr_t startAddress = reinterpret_cast<intptr_t>(GetModuleHandleW(nullptr));
 	MEMORY_BASIC_INFORMATION info;
-	uintptr_t endAddress = startAddress;
+	intptr_t endAddress = startAddress;
 
 	do
 	{
-		VirtualQuery((void*)endAddress, &info, sizeof(info));
-		endAddress = (uintptr_t)info.BaseAddress + info.RegionSize;
+		VirtualQuery(reinterpret_cast<void*>(endAddress), &info, sizeof(info));
+		endAddress = reinterpret_cast<intptr_t>(info.BaseAddress) + info.RegionSize;
 	} while (info.Protect > PAGE_NOACCESS);
 
 	endAddress -= info.RegionSize;
 
-	const DWORD procMemLength = static_cast<DWORD>(endAddress - startAddress);
-	const DWORD tarLength     = static_cast<DWORD>(tarBytes.size());
+	const std::size_t procMemLength = static_cast<std::size_t>(endAddress - startAddress);
+	const std::size_t tarLength     = tarBytes.size();
 	const BYTE* pProcData     = reinterpret_cast<BYTE*>(startAddress);
 
-	for (DWORD i = 0; i < procMemLength - tarLength; i++)
+	for (std::size_t i = 0; i < procMemLength - tarLength; i++)
 	{
-		for (DWORD j = 0; j <= tarLength; j++)
+		for (std::size_t j = 0; j <= tarLength; j++)
 		{
 			if (j == tarLength)
 				return startAddress + i;
@@ -158,11 +158,11 @@ uintptr_t findFunction(const std::vector<BYTE>& tarBytes)
 		}
 	}
 
-	return static_cast<uintptr_t>(-1);
+	return -1;
 }
 
-uintptr_t calcFunctionAddress(const uint32_t& funcOffset)
+intptr_t calcFunctionAddress(const intptr_t& funcOffset)
 {
-	const uintptr_t baseAddress = reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
+	const intptr_t baseAddress = reinterpret_cast<intptr_t>(GetModuleHandleW(nullptr));
 	return baseAddress + funcOffset;
 }

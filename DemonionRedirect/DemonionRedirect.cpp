@@ -179,9 +179,7 @@ private:
 
 nlohmann::json g_translations;
 
-static const std::string TRANSLATIONS_FILE = "tr.json";
-
-// static const std::vector<BYTE> EXE_STRING_FUNC = { 0x53, 0x56, 0x8B, 0xF1, 0x8B, 0x4C, 0x24, 0x0C, 0x57, 0x85, 0xC9, 0x74, 0x49, 0x8B, 0x7E, 0x18, 0x8D, 0x46, 0x04, 0x83, 0xFF, 0x08, 0x72, 0x04, 0x8B, 0x10, 0xEB, 0x02, 0x8B, 0xD0, 0x3B, 0xCA, 0x72, 0x34, 0x83, 0xFF, 0x08, 0x72, 0x04, 0x8B, 0x10, 0xEB, 0x02, 0x8B, 0xD0, 0x8B, 0x5E, 0x14, 0x8D, 0x14, 0x5A, 0x3B, 0xD1, 0x76, 0x1F, 0x83, 0xFF, 0x08, 0x72, 0x02, 0x8B, 0x00, 0x8B, 0x54, 0x24, 0x14, 0x2B, 0xC8, 0x52, 0xD1, 0xF9, 0x51, 0x56, 0x8B, 0xCE, 0xE8, 0x00, 0xFD, 0xFF, 0xFF };
+static const std::string TRANSLATIONS_FOLDER = "redirects";
 
 // RVA Offsets for the functions to hook
 static const uint32_t EXE_STRING_FUNC_1_OFFSET  = 0x41E0;
@@ -195,7 +193,7 @@ static const uint32_t FORMAT_STRING_FUNC_OFFSET = 0x1C2C40;
 
 extern "C"
 {
-	DWORD*(__fastcall* Real_ExeStringFunc1)(DWORD* a1, int32_t a2, BYTE* Source, uint32_t a4)                       = nullptr;
+	DWORD*(__fastcall* Real_ExeStringFunc1)(DWORD* a1, int32_t a2, BYTE* Source, uint32_t a4)                      = nullptr;
 	DWORD*(__fastcall* Real_ExeStringFunc2)(DWORD* a1, int32_t a2, BYTE* Source, uint32_t a4)                      = nullptr;
 	int*(__cdecl* Real_ExeStringFunc3)(int* a1, int a2, WORD* a3, int* a4, int a5, int a6, int a7, int a8, int a9) = nullptr;
 	int(WINAPI* Real_FormatStringFunc)(int a1, wchar_t* Format, ...)                                               = nullptr;
@@ -388,21 +386,10 @@ BOOL ProcessAttach(HMODULE hDll)
 
 	try
 	{
-		std::ifstream i(TRANSLATIONS_FILE);
-		if (i.is_open())
-		{
-			i >> g_translations;
-
+		g_translations = LoadTranslations(TRANSLATIONS_FOLDER);
 #if INCLUDE_DEBUG_LOGGING
 			Syelog(SYELOG_SEVERITY_INFORMATION, "### Loaded %d translations.\n", g_translations.size());
 #endif
-		}
-		else
-		{
-#if INCLUDE_DEBUG_LOGGING
-			Syelog(SYELOG_SEVERITY_WARNING, "### Warning: Could not open %s\n", TRANSLATIONS_FILE.c_str());
-#endif
-		}
 	}
 	catch ([[maybe_unused]] const std::exception& e)
 	{

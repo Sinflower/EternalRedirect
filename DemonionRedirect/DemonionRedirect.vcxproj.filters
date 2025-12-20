@@ -72,6 +72,9 @@
     <ClCompile Include="TranslationManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="RedirectManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\3rdParty\Detours\logging\syelog.h">
@@ -92,13 +95,13 @@
     <ClInclude Include="DetourEntry.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Globals.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Redirects.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="TranslationManager.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="RedirectManager.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

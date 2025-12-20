@@ -33,8 +33,8 @@
 #include <nlohmann/json.hpp>
 
 #include "DetourEntry.hpp"
-#include "Globals.hpp"
 #include "Logging.hpp"
+#include "RedirectManager.hpp"
 #include "Redirects.hpp"
 #include "TranslationManager.hpp"
 #include "Utils.hpp"
@@ -42,8 +42,6 @@
 //////////////////////////////////////////////////////////////////////////////
 
 //////////////////////////////////////////////////////////////////////////////
-
-DetourEntries g_detours;
 
 /////////////////////////////////////////////////////////////
 // AttachDetours
@@ -54,8 +52,7 @@ LONG AttachDetours(VOID)
 	DetourTransactionBegin();
 	DetourUpdateThread(GetCurrentThread());
 
-	for (const DetourEntry& detour : g_detours)
-		detour.Attach();
+	RedirectManager::AttachAllDetours();
 
 	return DetourTransactionCommit();
 }
@@ -65,8 +62,7 @@ LONG DetachDetours(VOID)
 	DetourTransactionBegin();
 	DetourUpdateThread(GetCurrentThread());
 
-	for (const DetourEntry& detour : g_detours)
-		detour.Detach();
+	RedirectManager::DetachAllDetours();
 
 	return DetourTransactionCommit();
 }
@@ -127,8 +123,7 @@ BOOL ProcessAttach(HMODULE hDll)
 		MessageBox(NULL, L"Failed to load the interface translation. Please make sure the corresponding JSON file is present and valid. Parts of the interface will not be translated.", L"Demonion 2 Redirect", MB_OK | MB_ICONERROR);
 	}
 
-	for (DetourEntry& detour : g_detours)
-		detour.Setup();
+	RedirectManager::SetupAllDetours();
 
 	LONG error = AttachDetours();
 

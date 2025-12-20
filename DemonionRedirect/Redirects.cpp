@@ -3,10 +3,13 @@
 #include <cstdint>
 #include <windows.h>
 
-#include "Globals.hpp"
 #include "Logging.hpp"
+#include "RedirectManager.hpp"
 #include "TranslationManager.hpp"
 #include "Utils.hpp"
+
+#define ADD_REDIRECT(PATTERN_OR_RVA, FUNC_NAME) \
+	RedirectManager::AddDetour(DetourEntry(PATTERN_OR_RVA, (PVOID*)&Real_##FUNC_NAME, (PVOID)Mine_##FUNC_NAME, #FUNC_NAME))
 
 // RVA Offsets for the functions to hook
 inline constexpr uint32_t EXE_STRING_FUNC_1_OFFSET  = 0x41E0;

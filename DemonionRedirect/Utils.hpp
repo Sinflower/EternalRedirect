@@ -28,13 +28,14 @@
 
 #include <filesystem>
 #include <format>
+#include <fstream>
 #include <string>
 #include <vector>
 #include <windows.h>
 
 #include <nlohmann/json.hpp>
 
-std::string sjis2utf8(const char* sjis)
+inline std::string sjis2utf8(const char* sjis)
 {
 	int len = MultiByteToWideChar(932, 0, sjis, -1, NULL, 0);
 	std::wstring wstr;
@@ -53,7 +54,7 @@ std::string sjis2utf8(const char* sjis)
 	return utf8;
 }
 
-std::string utf82sjis(const std::string& utf8)
+inline std::string utf82sjis(const std::string& utf8)
 {
 	int len = MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, NULL, 0);
 	std::wstring wstr;
@@ -72,7 +73,7 @@ std::string utf82sjis(const std::string& utf8)
 	return sjis;
 }
 
-std::string unicode2utf8(const std::wstring& unicode)
+inline std::string unicode2utf8(const std::wstring& unicode)
 {
 	int len = WideCharToMultiByte(CP_UTF8, 0, unicode.c_str(), -1, NULL, 0, NULL, NULL);
 	std::string utf8;
@@ -86,7 +87,7 @@ std::string unicode2utf8(const std::wstring& unicode)
 	return utf8;
 }
 
-std::wstring utf82unicode(const std::string& utf8)
+inline std::wstring utf82unicode(const std::string& utf8)
 {
 	int len = MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, NULL, 0);
 	std::wstring unicode;
@@ -100,7 +101,7 @@ std::wstring utf82unicode(const std::string& utf8)
 	return unicode;
 }
 
-std::string replaceAll(const std::string& str, const std::string& from, const std::string& to)
+inline std::string replaceAll(const std::string& str, const std::string& from, const std::string& to)
 {
 	std::string result = str;
 	size_t start_pos   = 0;
@@ -113,7 +114,7 @@ std::string replaceAll(const std::string& str, const std::string& from, const st
 	return result;
 }
 
-std::vector<std::string> splitString(const std::string& str, const char& delimiter = '\n')
+inline std::vector<std::string> splitString(const std::string& str, const char& delimiter = '\n')
 {
 	std::vector<std::string> tokens;
 	size_t start = 0;
@@ -130,48 +131,7 @@ std::vector<std::string> splitString(const std::string& str, const char& delimit
 	return tokens;
 }
 
-//
-// Determine the offset for the given function
-//
-intptr_t findFunction(const std::vector<BYTE>& tarBytes)
-{
-	const intptr_t startAddress = reinterpret_cast<intptr_t>(GetModuleHandleW(nullptr));
-	MEMORY_BASIC_INFORMATION info;
-	intptr_t endAddress = startAddress;
-
-	do
-	{
-		VirtualQuery(reinterpret_cast<void*>(endAddress), &info, sizeof(info));
-		endAddress = reinterpret_cast<intptr_t>(info.BaseAddress) + info.RegionSize;
-	} while (info.Protect > PAGE_NOACCESS);
-
-	endAddress -= info.RegionSize;
-
-	const std::size_t procMemLength = static_cast<std::size_t>(endAddress - startAddress);
-	const std::size_t tarLength     = tarBytes.size();
-	const BYTE* pProcData           = reinterpret_cast<BYTE*>(startAddress);
-
-	for (std::size_t i = 0; i < procMemLength - tarLength; i++)
-	{
-		for (std::size_t j = 0; j <= tarLength; j++)
-		{
-			if (j == tarLength)
-				return startAddress + i;
-			else if (pProcData[i + j] != tarBytes[j])
-				break;
-		}
-	}
-
-	return -1;
-}
-
-intptr_t calcFunctionAddress(const intptr_t& funcOffset)
-{
-	const intptr_t baseAddress = reinterpret_cast<intptr_t>(GetModuleHandleW(nullptr));
-	return baseAddress + funcOffset;
-}
-
-void PostProcessTranslations(nlohmann::json& translations)
+inline void PostProcessTranslations(nlohmann::json& translations)
 {
 	// Check if the JSON contains the "patterns" and "data" keys
 	if (!translations.contains("patterns") || !translations.contains("data"))
@@ -181,7 +141,7 @@ void PostProcessTranslations(nlohmann::json& translations)
 
 	// Get the patterns objects
 	nlohmann::json& patterns = translations["patterns"];
-	nlohmann::json& data = translations["data"];
+	nlohmann::json& data     = translations["data"];
 
 	for (auto& [key, value] : data.items())
 	{
@@ -200,7 +160,7 @@ void PostProcessTranslations(nlohmann::json& translations)
 	translations = newData;
 }
 
-nlohmann::json LoadTranslation(const std::filesystem::path& translationFilePath)
+inline nlohmann::json LoadTranslation(const std::filesystem::path& translationFilePath)
 {
 	nlohmann::json translations;
 
@@ -224,11 +184,11 @@ nlohmann::json LoadTranslation(const std::filesystem::path& translationFilePath)
 	return translations;
 }
 
-nlohmann::json LoadTranslations(const std::filesystem::path& translationFilePath)
+inline nlohmann::json LoadTranslations(const std::filesystem::path& translationFilePath)
 {
 	nlohmann::json translations;
 	if (!std::filesystem::exists(translationFilePath))
-				return translations;
+		return translations;
 
 	if (std::filesystem::is_directory(translationFilePath))
 	{

@@ -13,7 +13,7 @@ public:
 		return instance;
 	}
 
-	static void LoadTranslations(const std::filesystem::path& translationFilePath)
+	static void LoadTranslations(const std::filesystem::path& translationFilePath = "redirects")
 	{
 		GetInstance().loadTranslations(translationFilePath);
 	}

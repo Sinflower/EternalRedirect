@@ -106,6 +106,7 @@
       </PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)3rdParty\Detours\src;$(SolutionDir)3rdParty\Detours\logging;$(SolutionDir)3rdParty</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -174,7 +175,6 @@
     <ClInclude Include="..\3rdParty\Detours\logging\syelog.h" />
     <ClInclude Include="..\3rdParty\Detours\src\detours.h" />
     <ClInclude Include="..\3rdParty\Detours\src\detver.h" />
-    <ClInclude Include="Constants.hpp" />
     <ClInclude Include="DetourEntry.hpp" />
     <ClInclude Include="Globals.hpp" />
     <ClInclude Include="Logging.hpp" />

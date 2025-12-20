@@ -95,9 +95,6 @@
     <ClInclude Include="Globals.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Constants.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Redirects.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>

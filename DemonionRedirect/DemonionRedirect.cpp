@@ -32,7 +32,6 @@
 #include <detours.h>
 #include <nlohmann/json.hpp>
 
-#include "Constants.hpp"
 #include "DetourEntry.hpp"
 #include "Globals.hpp"
 #include "Logging.hpp"
@@ -115,7 +114,7 @@ BOOL ProcessAttach(HMODULE hDll)
 
 	try
 	{
-		TranslationManager::LoadTranslations(TRANSLATIONS_FOLDER);
+		TranslationManager::LoadTranslations();
 #if INCLUDE_DEBUG_LOGGING
 		Syelog(SYELOG_SEVERITY_INFORMATION, "### Loaded %d translations.\n", TranslationManager::GetTranslationCount());
 #endif

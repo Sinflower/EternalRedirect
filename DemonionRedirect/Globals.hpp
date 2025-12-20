@@ -4,7 +4,6 @@
 
 #include "DetourEntry.hpp"
 
-extern nlohmann::json g_translations;
 extern DetourEntries g_detours;
 
 #define ADD_REDIRECT(PATTERN_OR_RVA, FUNC_NAME) \

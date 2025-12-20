@@ -168,6 +168,7 @@
     <ClCompile Include="DetourEntry.cpp" />
     <ClCompile Include="Logging.cpp" />
     <ClCompile Include="Redirects.cpp" />
+    <ClCompile Include="TranslationManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\3rdParty\Detours\logging\syelog.h" />
@@ -178,6 +179,7 @@
     <ClInclude Include="Globals.hpp" />
     <ClInclude Include="Logging.hpp" />
     <ClInclude Include="Redirects.hpp" />
+    <ClInclude Include="TranslationManager.hpp" />
     <ClInclude Include="Utils.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

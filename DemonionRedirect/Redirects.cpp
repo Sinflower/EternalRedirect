@@ -5,6 +5,7 @@
 
 #include "Globals.hpp"
 #include "Logging.hpp"
+#include "TranslationManager.hpp"
 #include "Utils.hpp"
 
 // RVA Offsets for the functions to hook
@@ -24,89 +25,62 @@ extern "C"
 DWORD* __fastcall Mine_ExeStringFunc1(DWORD* a1, int32_t a2, BYTE* pSource, uint32_t a4)
 {
 	std::wstring unicodeStr = reinterpret_cast<const wchar_t*>(pSource);
-	std::string utf8String  = unicode2utf8(unicodeStr);
+	std::wstring trStr      = TranslationManager::GetTranslationW(unicodeStr);
 
-	// Check if this string exists in the translations
-	if (g_translations.contains(utf8String))
-	{
-		const std::string trStr = g_translations[utf8String].get<std::string>();
-		if (trStr == "")
-			return Real_ExeStringFunc1(a1, a2, pSource, a4);
+	if (trStr == L"")
+		return Real_ExeStringFunc1(a1, a2, pSource, a4);
 
 #if INCLUDE_DEBUG_LOGGING
-		_Print("[ExeStringFunc1]: %s\n", trStr.c_str());
+	_Print("[ExeStringFunc1]: %ls\n", trStr.c_str());
 #endif
 
-		unicodeStr = utf82unicode(trStr);
-		return Real_ExeStringFunc1(a1, a2, reinterpret_cast<BYTE*>(const_cast<wchar_t*>(unicodeStr.c_str())), unicodeStr.size());
-	}
-	else
-		return Real_ExeStringFunc1(a1, a2, pSource, a4);
+	return Real_ExeStringFunc1(a1, a2, reinterpret_cast<BYTE*>(const_cast<wchar_t*>(trStr.c_str())), trStr.size());
 }
 
 DWORD* __fastcall Mine_ExeStringFunc2(DWORD* a1, int32_t a2, BYTE* pSource, uint32_t a4)
 {
 	std::wstring unicodeStr = reinterpret_cast<const wchar_t*>(pSource);
-	std::string utf8String  = unicode2utf8(unicodeStr);
+	std::wstring trStr      = TranslationManager::GetTranslationW(unicodeStr);
 
-	// Check if this string exists in the translations
-	if (g_translations.contains(utf8String))
-	{
-		const std::string trStr = g_translations[utf8String].get<std::string>();
-		if (trStr == "")
-			return Real_ExeStringFunc2(a1, a2, pSource, a4);
+	if (trStr == L"")
+		return Real_ExeStringFunc2(a1, a2, pSource, a4);
 
 #if INCLUDE_DEBUG_LOGGING
-		_Print("[ExeStringFunc2]: %s\n", trStr.c_str());
+	_Print("[ExeStringFunc2]: %ls\n", trStr.c_str());
 #endif
 
-		unicodeStr = utf82unicode(trStr);
-		return Real_ExeStringFunc2(a1, a2, reinterpret_cast<BYTE*>(const_cast<wchar_t*>(unicodeStr.c_str())), unicodeStr.size());
-	}
-	else
-		return Real_ExeStringFunc2(a1, a2, pSource, a4);
+	return Real_ExeStringFunc2(a1, a2, reinterpret_cast<BYTE*>(const_cast<wchar_t*>(trStr.c_str())), trStr.size());
 }
 
 int* __cdecl Mine_ExeStringFunc3(int* a1, int a2, WORD* a3, int* a4, int a5, int a6, int a7, int a8, int a9)
 {
 	std::wstring unicodeStr = reinterpret_cast<const wchar_t*>(a3);
-	std::string utf8String  = unicode2utf8(unicodeStr);
+	std::wstring trStr      = TranslationManager::GetTranslationW(unicodeStr);
 
-	// Check if this string exists in the translations
-	if (g_translations.contains(utf8String))
-	{
-		const std::string trStr = g_translations[utf8String].get<std::string>();
-		if (trStr == "")
-			return Real_ExeStringFunc3(a1, a2, a3, a4, a5, a6, a7, a8, a9);
+	if (trStr == L"")
+		return Real_ExeStringFunc3(a1, a2, a3, a4, a5, a6, a7, a8, a9);
 
 #if INCLUDE_DEBUG_LOGGING
-		_Print("[ExeStringFunc3]: %s\n", trStr.c_str());
+	_Print("[ExeStringFunc3]: %ls\n", trStr.c_str());
 #endif
 
-		unicodeStr = utf82unicode(trStr);
-		return Real_ExeStringFunc3(a1, a2, reinterpret_cast<WORD*>(const_cast<wchar_t*>(unicodeStr.c_str())), a4, a5, a6, a7, a8, a9);
-	}
-	else
-		return Real_ExeStringFunc3(a1, a2, a3, a4, a5, a6, a7, a8, a9);
+	return Real_ExeStringFunc3(a1, a2, reinterpret_cast<WORD*>(const_cast<wchar_t*>(trStr.c_str())), a4, a5, a6, a7, a8, a9);
 }
 
 int WINAPI Mine_FormatStringFunc(int a1, wchar_t* Format, ...)
 {
 	const std::size_t BUFFER_SIZE = 4096;
 	wchar_t buffer[BUFFER_SIZE];
-	std::string utf8FmtStr = unicode2utf8(Format);
-	std::wstring fmtStr    = Format;
+	std::wstring fmtStr = Format;
+	std::wstring trStr  = TranslationManager::GetTranslationW(fmtStr);
 
-	if (g_translations.contains(utf8FmtStr))
+	if (trStr != L"")
 	{
-		const std::string trStr = g_translations[utf8FmtStr].get<std::string>();
-		if (trStr != "")
-		{
-			fmtStr = utf82unicode(trStr);
+		fmtStr = trStr;
+
 #if INCLUDE_DEBUG_LOGGING
-			_Print("[FormatStringFunc]: %s\n", trStr.c_str());
+		_Print("[FormatStringFunc]: %ls\n", fmtStr.c_str());
 #endif
-		}
 	}
 
 	va_list args;

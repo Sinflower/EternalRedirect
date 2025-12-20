@@ -69,6 +69,9 @@
     <ClCompile Include="Redirects.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="TranslationManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\3rdParty\Detours\logging\syelog.h">
@@ -96,6 +99,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Redirects.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="TranslationManager.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

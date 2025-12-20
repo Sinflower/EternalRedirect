@@ -37,13 +37,13 @@
 #include "Globals.hpp"
 #include "Logging.hpp"
 #include "Redirects.hpp"
+#include "TranslationManager.hpp"
 #include "Utils.hpp"
 
 //////////////////////////////////////////////////////////////////////////////
 
 //////////////////////////////////////////////////////////////////////////////
 
-nlohmann::json g_translations;
 DetourEntries g_detours;
 
 /////////////////////////////////////////////////////////////
@@ -115,9 +115,9 @@ BOOL ProcessAttach(HMODULE hDll)
 
 	try
 	{
-		g_translations = LoadTranslations(TRANSLATIONS_FOLDER);
+		TranslationManager::LoadTranslations(TRANSLATIONS_FOLDER);
 #if INCLUDE_DEBUG_LOGGING
-		Syelog(SYELOG_SEVERITY_INFORMATION, "### Loaded %d translations.\n", g_translations.size());
+		Syelog(SYELOG_SEVERITY_INFORMATION, "### Loaded %d translations.\n", TranslationManager::GetTranslationCount());
 #endif
 	}
 	catch ([[maybe_unused]] const std::exception& e)

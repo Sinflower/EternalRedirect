@@ -94,12 +94,12 @@ BOOL ThreadDetach([[maybe_unused]] HMODULE hDll)
 
 BOOL ProcessAttach(HMODULE hDll)
 {
+	SetupRedirects();
+
 #if INCLUDE_DEBUG_LOGGING
 	WCHAR wzExeName[MAX_PATH];
 
 	GetModuleFileNameW(NULL, wzExeName, ARRAYSIZE(wzExeName));
-
-	SetupRedirects();
 
 	SyelogOpen("demon" DETOURS_STRINGIFY(DETOURS_BITS), SYELOG_FACILITY_APPLICATION);
 	Syelog(SYELOG_SEVERITY_INFORMATION, "##################################################################\n");
